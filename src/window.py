@@ -7,19 +7,6 @@ import pygame
 from simulation import Environment
 from simulation import ActivationFunction
 
-def evo_rule(pos_x, pos_y, heading, generation):
-    #return pos_x > -0.25 and pos_x < 0.25 and pos_y > -0.5 and pos_y < 0.5
-    #return pos_x ** 2 + pos_y ** 2 < 0.5 ** 2
-    if generation < 250:
-        portion = 0.2
-        return pos_x < -portion or pos_x > portion
-    elif generation >= 250 and generation <= 500:
-        portion = 0.2 + 0.7 * (generation - 250) / 250
-        return pos_x < -portion or pos_x > portion
-    else:
-        portion = 0.9
-        return pos_x < -portion or pos_x > portion
-
 class SimulationData:
     """
     This class holds the environment (which holds the creatures), the data of 
@@ -69,48 +56,28 @@ class SimulationData:
         # Set boolean indicating if this simulation is currently being 
         # rendered.
         self.is_rendering = False
-        
-        self.temp = False
     
-    def simulate_and_evolve(self, delta_time, max_time, generation):
+    def simulate_and_evolve(self, generation):
         """
-        Runs one full simulation round using the delta_time and max_time and 
-        applies the evolution mechanism using the simulation rule function 
-        and generation number.
+        Runs one full simulation and applies the evolution mechanism using 
+        the simulation rule function and generation number.
         """
-        # Check types.
-        func_name = "SimulationData.__init__()"
-        
-        # Check if max time is greater or equal to than delta time.
-        assert max_time >= delta_time, f"{func_name}: Max time must be " \
-            "greater than or equal to delta time."
-        
         # Run simulation.
-        self.creature_data_dict = self.environment.simulate(\
-            delta_time=delta_time, max_time=max_time)
+        self.creature_data_dict = self.environment.simulate()
         
         # Apply evolution.
         num_survivors = self.environment.apply_evolution(rule=self.rule, \
             generation=generation)
         self.survivors_accumulate.append(num_survivors)
     
-    def simulate_and_evolve_multi_threaded(self, delta_time, max_time, \
-        generation):
+    def simulate_and_evolve_multi_threaded(self, generation):
         """
-        Runs one full simulation round using the delta_time and max_time and 
-        applies the evolution mechanism using the simulation rule function 
-        and generation number. This is the multi threaded version.
+        Runs one full simulation and applies the evolution mechanism using 
+        the simulation rule function and generation number. This is the multi 
+        threaded version.
         """
-        # Check types.
-        func_name = "SimulationData.simulate_and_evolve_multi_threaded()"
-        
-        # Check if max time is greater or equal to than delta time.
-        assert max_time >= delta_time, f"{func_name}: Max time must be " \
-            "greater than or equal to delta time."
-        
         # Run simulation.
-        self.creature_data_dict = self.environment.simulate(\
-            delta_time=delta_time, max_time=max_time)
+        self.creature_data_dict = self.environment.simulate()
         
         # Apply evolution.
         num_survivors = self.environment.apply_evolution(rule=self.rule, \
@@ -154,7 +121,11 @@ class SimulationData:
 class Window:
     
     def __init__(self, window_dimensions, simulation_specs, \
-        enable_multithreading=False):
+        enable_multithreading=False, mutation_chance=0.01, \
+        mutation_max=0.05, brain_hidden_layers=(8,), \
+        brain_activation_functions=ActivationFunction.Relu, delta_time=0.1, \
+        max_time=10.0, max_creature_velocity=0.25, generations_per_render=1, \
+        render_speedup=1.0):
         """
         Initializes pygame and creates a font and a display. It creates 
         simulations based on the provided simulation specs.
@@ -172,21 +143,26 @@ class Window:
             
             Optional parameters
             mutation_chance (default=0.01)
-                Float in the interval [0, 1] specifying the probility that 
-                any individual weight will be altered in the evolution step.
+                Float in the interval [0, 1] specifying the probability that 
+                any individual weight will be altered in the evolution step. 
+                If not present, the simulation will use the global mutation 
+                chance passed to the Window constructor.
             mutation_max (default=0.05)
                 Float specifying the maximum amount a weight can be altered 
                 by, proportional to the current value of the weight. E.g. if 
                 this parameter is equal to 0.05 a weight will be multiplied 
-                by a float in the interval [0.95, 1.05].
+                by a float in the interval [0.95, 1.05]. If not present, the 
+                simulation will use the global mutation max passed to the 
+                Window constructor.
             brain_hidden_layers (default=(8,))
                 A tuple containing the number of nodes in each hidden layer 
                 of the brain of the creature, the input layer is fixed at 4 
                 nodes, and the output layer is fixed at 2 nodes. E.g. if this 
                 parameter is equal to (8, 6), the brain structure will look 
-                like (4, 8, 6, 2).
+                like (4, 8, 6, 2). If not present, the simulation will use 
+                the global brain hidden layers passed to the Window 
+                constructor.
             brain_activation_functions (default=ActivationFunction.Relu)
-                (requires brain_hidden_layers to be defined)
                 Controls the activation functions used by creature brains. 
                 Must either be equal to a single ActivationFunction, or a 
                 tuple of ActivationFunction's. If a single ActivationFunction 
@@ -194,7 +170,56 @@ class Window:
                 layer, which will use a linear activation function. If a 
                 tuple is supplied, the size of the tuple must be equal to the 
                 number of layers minus 1 (because the input layer has no 
-                activation function).
+                activation function). If not present, the simulation will use 
+                the global brain activation functions passed to the Window 
+                constructor.
+            delta_time (default=0.1)
+                Sets the time amount the simulation time is increased by 
+                every timestep. If not present, the simulation will use the 
+                global delta time passed to the Window constructor.
+            max_time (default=10.0)
+                When this simulation time is reached, the simulation 
+                terminates and the evolution step starts. If not present, the 
+                simulation will use the global max time passed to the Window 
+                constructor.
+            max_creature_velocity (default=0.25)
+                The maximum creature velocity in half fields per second. Must 
+                be a positive float. If not present, the simulation will use 
+                the global max creature velocity passed to the Window 
+                constructor.
+        Enable multithreading must be a boolean specifying whether to use 
+            multithreading or not.
+        Mutation chance must be a float in the interval [0, 1], it works the 
+            same as mutation_chance per simulation, but globally. Simulation 
+            settings override global settings locally.
+            Mutation max must be a positive float, it works the same as 
+            mutation_max per simulation, but globally. Simulation settings 
+            override global settings locally.
+        Brain hidden layers must be a tuple containing the number of nodes in 
+            each hidden layer of the brain of the creature. It works the same 
+            as brain_hidden_layers per simulation, but globally. Simulation 
+            settings override global settings locally.
+        Brain activation functions controls the activation functions used by 
+            creature brains. It works the same as brain_activation_functions 
+            per simulation, but globally. Simulation settings override global 
+            settings locally.
+        Delta time must be a positive float, it works the same as delta_time 
+            per simulation, but globally. Simulation settings override global 
+            settings locally.
+        Max time must be a positive float, it works the same as max_time per 
+            simulation, but globally. Simulation settings override global 
+            settings locally.
+        Max creature velocity must be a positive float, it works the same as 
+            max_creature_velocity per simulation, but globally. Simulation 
+            settings override global settings locally.
+        Generations per render must be a positive integer. It specifies the 
+            number of generations to simulate before rendering. For example, 
+            if this setting is set to 5, it will render every fifth 
+            simulation.
+        Render speedup must be a positive float. It specifies how fast the 
+            simulations should be rendered. For example, a setting of 1.0 
+            renders the simulation in real time, 0.5 at half the speed, and 
+            2.0 at double the speed.
         """
         # Check types.
         func_name = "Window.__init__()"
@@ -249,7 +274,11 @@ class Window:
                     "in the interval [0, 1]."
             if "mutation_max" in spec_dict.keys():
                 assert isinstance(spec_dict["mutation_max"], float), \
-                    f"[Simulation {index}] Mutation max must be a float."
+                    f"[Simulation {index}] Mutation max must be a " \
+                    "non-negative float."
+                assert spec_dict["mutation_max"] >= 0, \
+                    f"[Simulation {index}] Mutation max must be a " \
+                    "non-negative float."
             if "brain_hidden_layers" in spec_dict.keys():
                 assert isinstance(spec_dict["brain_hidden_layers"], tuple), \
                     f"[Simulation {index}] Brain hidden layers must be a " \
@@ -261,9 +290,6 @@ class Window:
                     assert n > 0, f"[Simulation {index}] Brain hidden " \
                         "layers must be a tuple containing positive integers."
             if "brain_activation_functions" in spec_dict.keys():
-                assert "brain_hidden_layers" in spec_dict.keys(), \
-                    f"[Simulation {index}] Brain hidden layers must be " \
-                    "defined in order to use brain activation functions."
                 baf = spec_dict["brain_activation_functions"]
                 assert isinstance(baf, ActivationFunction) \
                     or isinstance(baf, tuple), f"[Simulation {index}] " \
@@ -275,15 +301,133 @@ class Window:
                             f"[Simulation {index}] Brain activation " \
                             "functions must be an ActivationFunction or a " \
                             "tuple of ActivationFunction's."
+                    
+                    num_layers = len(spec_dict["brain_hidden_layers"]) + 2 \
+                        if "brain_hidden_layers" in spec_dict \
+                        else len(brain_hidden_layers) + 2
+                    assert len(baf) == num_layers - 1, \
+                        f"[Simulation {index}] Brain activation functions " \
+                        "(as a tuple) must have a length equal to the " \
+                        "total number of layers minus 1."
+            
+            if "delta_time" in spec_dict.keys():
+                assert isinstance(spec_dict["delta_time"], float), \
+                    f"[Simulation {index}] Delta time must be a positive " \
+                    "float."
+                assert spec_dict["delta_time"] > 0, f"[Simulation {index}] " \
+                    "Delta time must be a positive float."
+            if "max_time" in spec_dict.keys():
+                assert isinstance(spec_dict["max_time"], float), \
+                    f"[Simulation {index}] Max time must be a positive " \
+                    "float."
+                assert spec_dict["max_time"] > 0, f"[Simulation {index}] " \
+                    "Max time must be a positive float."
+            delta_time_temp = spec_dict["delta_time"] \
+                if "delta_time" in spec_dict.keys() else delta_time
+            max_time_temp   = spec_dict["max_time"] \
+                if "max_time" in spec_dict.keys() else max_time
+            if delta_time_temp >= max_time_temp:
+                print(f"[WARNING] [Simulation {index}] Delta time is " \
+                    "greater than or equal to max time, this may lead to " \
+                    "the simulation only executing one timestep.")
+            
+            if "max_creature_velocity" in spec_dict.keys():
+                assert isinstance(spec_dict["max_creature_velocity"], float), \
+                    f"[Simulation {index}] Max creature velocity must be a " \
+                    "positive float."
+                assert spec_dict["max_creature_velocity"] > 0, \
+                    f"[Simulation {index}] Max creature velocity must be a " \
+                    "positive float."
         
-        # Check if the number of simulations is no bigger than 2500.
+        # Check if the number of simulations is no bigger than 10000.
         assert len(simulation_specs) <= 10000, f"{func_name}: More than " \
             "10000 simulations are not supported."
+        
+        # Check if enable_multithreading is a boolean.
+        assert isinstance(enable_multithreading, bool), f"{func_name}: " \
+            "Enable multithreading must be a boolean."
+        
+        # Check if mutation_chance is a float in the interval [0, 1].
+        assert isinstance(mutation_chance, float), f"{func_name}: Mutation " \
+            "chance must be a float in the interval [0, 1]."
+        assert mutation_chance >= 0 and mutation_chance <= 1, \
+            f"{func_name}: Mutation chance must be a float in the interval " \
+            "[0, 1]."
+        
+        # Check if mutation_max is a non-negative float.
+        assert isinstance(mutation_max, float), f"{func_name}: Mutation " \
+            "max must be a non-negative float."
+        assert mutation_max >= 0, f"{func_name}: Mutation " \
+            "max must be a non-negative float."
+        
+        # Check if brain hidden layers is a tuple containing positive 
+        # integers.
+        assert isinstance(brain_hidden_layers, tuple), \
+            f"{func_name}: Brain hidden layers must be a " \
+            "tuple containing positive integers."
+        for n in brain_hidden_layers:
+            assert isinstance(n, int), f"{func_name}: Brain hidden layers " \
+                "must be a tuple containing positive integers."
+            assert n > 0, f"{func_name}: Brain hidden layers " \
+                "must be a tuple containing positive integers."
+        
+        # Check if brain activation functions is either an ActivationFunction 
+        # or a tuple containing ActivationFunction's.
+        assert isinstance(brain_activation_functions, ActivationFunction) \
+            or isinstance(brain_activation_functions, tuple), \
+            f"{func_name}: Brain activation functions must be an " \
+            "ActivationFunction or a tuple of ActivationFunction's."
+        if isinstance(brain_activation_functions, tuple):
+            for a in brain_activation_functions:
+                assert isinstance(a, ActivationFunction), \
+                    f"{func_name}: Brain activation functions must be an " \
+                    "ActivationFunction or a tuple of ActivationFunction's."
+            
+            num_layers = len(brain_hidden_layers) + 2
+            assert len(brain_activation_functions) == num_layers - 1, \
+                f"{func_name}: Brain activation functions (as a tuple) " \
+                "must have a length equal to the total number of layers " \
+                "minus 1."
+        
+        # Check if delta_time and max_time are positive floats.
+        assert isinstance(delta_time, float), f"{func_name}: Delta time " \
+            "must be a positive float."
+        assert delta_time > 0, f"{func_name}: Delta time " \
+            "must be a positive float."
+        assert isinstance(max_time, float), f"{func_name}: Max time " \
+            "must be a positive float."
+        assert max_time > 0, f"{func_name}: Max time " \
+            "must be a positive float."
+        
+        # Check if max_creature_velocity is a positive float.
+        assert isinstance(max_creature_velocity, float), f"{func_name}: " \
+            "Max creature velocity must be a positive float."
+        assert max_creature_velocity > 0, f"{func_name}: Max creature " \
+            "velocity must be a positive float."
+        
+        # Check if generations_per_render is a positive integer.
+        assert isinstance(generations_per_render, int), f"{func_name}: " \
+            "Generations per render must be a positive integer."
+        assert generations_per_render > 0, f"{func_name}: " \
+            "Generations per render must be a positive integer."
+        
+        # Check if render_speedup is a positive float.
+        assert isinstance(render_speedup, float), f"{func_name}: Render " \
+            "speedup must be a positive float."
+        assert render_speedup > 0, f"{func_name}: Render " \
+            "speedup must be a positive float."
+        
+        # Warn the user if delta_time is greater than or equal to max_time.
+        if delta_time >= max_time:
+            print(f"[WARNING] Delta time is greater than or equal to max " \
+                "time, this may lead to the simulation only executing one " \
+                "timestep.")
         
         # Report unsupported simulation specification dictionary keys.
         supported_keys = ["number_of_creatures", "evolution_rule", \
             "mutation_chance", "mutation_max", "brain_hidden_layers", \
-            "brain_activation_functions"]
+            "brain_activation_functions", "delta_time", "max_time", \
+            "max_creature_velocity"]
         for index, spec_dict in enumerate(simulation_specs):
             for key in spec_dict.keys():
                 if not key in supported_keys:
@@ -301,7 +445,7 @@ class Window:
         self.window_dimensions = window_dimensions
         self.display = pygame.display.set_mode(window_dimensions, \
             flags=pygame.HWSURFACE | pygame.DOUBLEBUF)
-        pygame.display.set_caption("Simulation Program")
+        pygame.display.set_caption("Basic Evolution Simulation")
         
         # Initialize simulations.
         self.simulations = []
@@ -315,15 +459,38 @@ class Window:
             if "mutation_chance" in spec_dict.keys():
                 optional_parameters["mutation_chance"] = \
                     spec_dict["mutation_chance"]
+            else:
+                optional_parameters["mutation_chance"] = mutation_chance
             if "mutation_max" in spec_dict.keys():
                 optional_parameters["mutation_max"] = \
                     spec_dict["mutation_max"]
+            else:
+                optional_parameters["mutation_max"] = mutation_max
+            
             if "brain_hidden_layers" in spec_dict.keys():
                 optional_parameters["brain_hidden_layers"] = \
                     spec_dict["brain_hidden_layers"]
-                if "brain_activation_functions" in spec_dict.keys():
-                    optional_parameters["brain_activation_functions"] = \
-                        spec_dict["brain_activation_functions"]
+            else:
+                optional_parameters["brain_hidden_layers"] = brain_hidden_layers
+            if "brain_activation_functions" in spec_dict.keys():
+                optional_parameters["brain_activation_functions"] = \
+                    spec_dict["brain_activation_functions"]
+            else:
+                optional_parameters["brain_activation_functions"] = brain_activation_functions
+            
+            if "delta_time" in spec_dict.keys():
+                optional_parameters["delta_time"] = spec_dict["delta_time"]
+            else:
+                optional_parameters["delta_time"] = delta_time
+            if "max_time" in spec_dict.keys():
+                optional_parameters["max_time"] = spec_dict["max_time"]
+            else:
+                optional_parameters["max_time"] = max_time
+            
+            if "max_creature_velocity" in spec_dict.keys():
+                optional_parameters["max_creature_velocity"] = spec_dict["max_creature_velocity"]
+            else:
+                optional_parameters["max_creature_velocity"] = max_creature_velocity
             
             # Create environment.
             environment = Environment(number_of_creatures, \
@@ -339,16 +506,13 @@ class Window:
         self.number_of_creatures = sum([sim.environment.number_of_creatures \
             for sim in self.simulations])
         
-        # Set member variables.
-        self.sim_delta_time =  0.1
-        self.sim_max_time   = 10.0
-        
+        # Initialize generation counter member variable.
         self.generation = 0
-        self.generations_per_render = 5
         
-        self.render_speedup = 4
-        
-        self.mt = enable_multithreading
+        # Initialize generations per render and render speedup member 
+        # variables.
+        self.generations_per_render = generations_per_render
+        self.render_speedup = render_speedup
         
         # Create list of 100 double numbers.
         lst = []
@@ -366,6 +530,7 @@ class Window:
                 break
         
         # Initialize multiprocessing pool if enabled.
+        self.mt = enable_multithreading
         self.pool = mp.Pool() if self.mt else None
     
     def start(self, fps=60):
@@ -373,6 +538,14 @@ class Window:
         Renders and updates the simulations, this is the main loop of the 
         program.
         """
+        # Check types.
+        func_name = "Window.start()"
+        
+        # Check that fps is a positive integer.
+        assert isinstance(fps, int), f"{func_name}: Fps must be a positive " \
+            "integer."
+        assert fps > 0, f"{func_name}: Fps must be a positive integer."
+        
         # Create clock.
         clock = pygame.time.Clock()
         
@@ -481,8 +654,7 @@ class Window:
         # Loop over all simulations.
         for sim in self.simulations:
             # Run simulation and evolve.
-            sim.simulate_and_evolve(delta_time=self.sim_delta_time, \
-                max_time=self.sim_max_time, generation=self.generation)
+            sim.simulate_and_evolve(generation=self.generation)
         
         # Render simulation if necessary.
         render_sim = self.generation % self.generations_per_render == 0
@@ -505,7 +677,7 @@ class Window:
         for index, sim in enumerate(self.simulations):
             result = self.pool.apply_async(\
                 sim.simulate_and_evolve_multi_threaded, \
-                args=(self.sim_delta_time, self.sim_max_time, self.generation))
+                args=(self.generation,))
             results.append(result)
         
         # Update simulation member variables using result objects.

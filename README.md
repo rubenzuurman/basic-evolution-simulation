@@ -15,6 +15,25 @@ This project is a very basic simulation for testing evolution algorithms. At thi
 5. Run `src/application.py` in the virtual environment.
 
 ## Simulation Parameters
+### Global Parameters
+Several global simulation parameters are available, and need to be passed to the `Window` constructor.
+
+**delta_time** *optional (default=0.1)* - The time that the simulation time is incremented by every timestep. Must be a positive float.<br />
+**max_time** *optional (default=10.0)* - The simulation time after which the simulation terminates and the evolution step starts. Must be a positive float.<br />
+**mutation_chance** *optional (default=0.01)* - Specifies the probability that any individual weight will be altered in the evolution step. Must be a float in the interval \[0, 1\].<br />
+**mutation_max** *optional (default=0.05)* - Specifies the maximum amount a weight can be altered by, proportional to the current value of the weight. For example if this value is equal to 0.05, the weight can be multiplied by any float in the range \[0.95, 1.05\]. Must be a float.<br />
+**brain_hidden_layers** *optional (default=(8,))* - A tuple containing the number of nodes in each hidden layer in the neural network brains of the creatures. The number of inputs is fixed at 4 neurons, the number of outputs is fixed at 2 neurons, this means the default structure of the neural network is (4, 8, 2).<br />
+**brain_activation_functions** *optional (default=ActivationFunction.Relu)* - Specifies which activation function(s) is/are used in the neural networks. This parameter can be one of two types:
+
+- A single activation function, in this case this activation function will be used for all hidden layers, a linear activation function will be used for the output layer.
+- A tuple containing activation functions. The tuple must contain an activation function for all layers except for the input layer. The activation functions will be used for the corresponding layers.
+
+**enable_multithreading** *optional (default=False)* - Boolean specifying whether or not to use multithreading (see the `Multithreading` section below for more information).<br />
+**max_creature_velocity** *optional (default=0.25)* - The maximum velocity of the creatures in the simulation in terms of half fields per second (from the left to the right of the field is a distance of 2.0). Must be a positive float.<br />
+**generations_per_render** *optional (default=1)* - The number of generations to simulate before rendering. For example, if this setting is set to 5, it will render every fifth simulation.<br />
+**render_speedup** *optional (default=1.0)* - Specifies how fast the simulations should be rendered. For example, a setting of 1.0 renders the simulation in real time, 0.5 at half the speed, and 2.0 at double the speed.
+
+### Simulation Specific Parameters
 Simulations have several configurable parameters, which are described below.
 
 **number_of_creatures** *required* - The number of creatures that will exist in the simulation at any time. Must be a positive integer.<br />
@@ -26,13 +45,18 @@ Simulations have several configurable parameters, which are described below.
 - Generation: Positive integer indicating the current generation of the population, increments every evolution step. This can for example be used to make the criteria more strict for later generations.
 
 The function should return a boolean indicating whether or not the creature survives.<br />
-**mutation_chance** *optional (default=0.01)* - The probability that any individual weight will be altered in the evolution step. Must be a float in the range \[0, 1\].<br />
-**mutation_max** *optional (default=0.05)* - The maximum amount a weight will be altered by, proportional to the current value of the weight. For example if this value is equal to 0.05, the weight can be multiplied by any float in the range \[0.95, 1.05\].<br />
-**brain_hidden_layers** *optional (default=(8,))* - A tuple containing the number of nodes in each hidden layer in the neural network brains of the creatures. The number of inputs is fixed at 4 neurons, the number of outputs is fixed at 2 neurons, this means the default structure of the neural network is (4, 8, 2).<br />
-**brain_activation_functions** *optional (default=ActivationFunction.Relu) (Requires brain_hidden_layers to be defined)* - Specifies which activation function(s) is/are used in the neural networks. This parameter can be one of two types:
+**mutation_chance** *optional (default=0.01)* - The probability that any individual weight will be altered in the evolution step. Must be a float in the range \[0, 1\]. If not present, the simulation will use the global mutation chance passed to the `Window` constructor.<br />
+**mutation_max** *optional (default=0.05)* - The maximum amount a weight will be altered by, proportional to the current value of the weight. For example if this value is equal to 0.05, the weight can be multiplied by any float in the range \[0.95, 1.05\]. Must be a float. If not present, the simulation will use the global mutation max passed to the `Window` constructor.<br />
+**brain_hidden_layers** *optional (default=(8,))* - A tuple containing the number of nodes in each hidden layer in the neural network brains of the creatures. The number of inputs is fixed at 4 neurons, the number of outputs is fixed at 2 neurons, this means the default structure of the neural network is (4, 8, 2). If not present, the simulation will use the global brain hidden layers passed to the `Window` constructor.<br />
+**brain_activation_functions** *optional (default=ActivationFunction.Relu)* - Specifies which activation function(s) is/are used in the neural networks. This parameter can be one of two types:
 
 - A single activation function, in this case this activation function will be used for all hidden layers, a linear activation function will be used for the output layer.
 - A tuple containing activation functions. The tuple must contain an activation function for all layers except for the input layer. The activation functions will be used for the corresponding layers.
+
+If not present, the simulation will use the global brain activation functions passed to the `Window` constructor.<br />
+**delta_time** *optional (default=0.1)* - The time that the simulation time is incremented by every timestep. Must be a positive float. If not present, the simulation will use the global delta time passed to the `Window` constructor.<br />
+**max_time** *optional (default=10.0)* - The simulation time after which the simulation terminates and the evolution step starts. Must be a positive float. If not present, the simulation will use the global max time passed to the `Window` constructor.<br />
+**max_creature_velocity** *optional (default=0.25)* - The maximum velocity of the creatures in the simulation in terms of half fields per second (from the left to the right of the field is a distance of 2.0). Must be a positive float. If not present, the simulation will use the global max creature velocity passed to the `Window` constructor.
 
 ## Simulation and Evolution
 When a simulation and evolution are run, the following steps are executed.
@@ -148,7 +172,7 @@ $y_{offset} = - f/2$
 Multithreading is currently supported in the sense that when a step of simulation and evolution is run, every simulation runs on its own thread. These threads are joined directly after simulating, meaning the application is as fast as the slowest simulation while simulating. Multithreading can be enabled by supplying the `Window` constructor with `enable_multithreading=True`, it is disabled by default.
 
 ## Future plans
-- [ ] Make more of the program configurable.
+- [x] Make more of the program configurable. *27-02-2023*
 - [ ] Improve the graph.
 - [ ] Add way to visualize neural networks used in each simulation.
 - [ ] Add way to visualize the rule used for each simulation.

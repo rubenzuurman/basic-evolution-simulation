@@ -1,7 +1,6 @@
 import copy
 import math
 import multiprocessing as mp
-import pickle
 import random as rnd
 import time
 
@@ -29,25 +28,34 @@ class Environment:
             mutation_max
             brain_hidden_layers
             brain_activation_functions
+            delta_time
+            max_time
+            max_creature_velocity
         """
         # Set member variables.
         self.number_of_creatures = number_of_creatures
         
-        # Set mutation member variables.
-        self.mutation_chance = optional_parameters["mutation_chance"] \
-            if "mutation_chance" in optional_parameters.keys() else 0.01
-        self.mutation_max = optional_parameters["mutation_max"] \
-            if "mutation_max" in optional_parameters.keys() else 0.05
+        # Set mutation member variables. Also 'optional' like delta_time and 
+        # max_time.
+        self.mutation_chance = optional_parameters["mutation_chance"]
+        self.mutation_max = optional_parameters["mutation_max"]
         
-        # Set brain size and activation functions member variables.
-        self.brain_hidden_layers = \
-            optional_parameters["brain_hidden_layers"] \
-            if "brain_hidden_layers" in optional_parameters \
-            else (8,)
-        self.brain_activation_functions = \
-            optional_parameters["brain_activation_functions"] \
-            if "brain_activation_functions" in optional_parameters.keys() \
-            else ActivationFunction.Relu
+        # Set brain size and activation functions member variables. Also 
+        # 'optional' like delta_time and max_time.
+        self.brain_hidden_layers = optional_parameters["brain_hidden_layers"]
+        self.brain_activation_functions = optional_parameters["brain_activation_functions"]
+        
+        # Set delta time and max time member variables. These 'optional' 
+        # parameters use the globally set parameters in the Window 
+        # constructor in case no simulation specific parameters were set. If 
+        # those global parameters are not set either, the default global 
+        # parameters will be used.
+        self.delta_time = optional_parameters["delta_time"]
+        self.max_time   = optional_parameters["max_time"]
+        
+        # Set max creature velocity member variable. Also 'optional' like 
+        # delta_time and max_time.
+        self.max_creature_velocity = optional_parameters["max_creature_velocity"]
         
         # Initialize creatures list.
         self.creatures = []
@@ -56,8 +64,8 @@ class Environment:
                 brain_activation_functions=self.brain_activation_functions)
             self.creatures.append(creature)
     
-    def simulate_creature(self, creature, delta_time, max_time, \
-        multi_threaded=False, shared_dict=None):
+    def simulate_creature(self, creature, multi_threaded=False, \
+        shared_dict=None):
         """
         Takes as inputs the creature class, the delta time to use, the 
         maximum time to go until, and if this is a call from a multi threaded 
@@ -74,7 +82,7 @@ class Environment:
         
         # Run simulation.
         current_time = 0
-        while current_time < max_time:
+        while current_time < self.max_time:
             # Get position.
             pos = creature.position
             
@@ -94,15 +102,16 @@ class Environment:
             heading_delta = brain_output[1]
             
             # Update creature velocity and heading.
-            creature.velocity = clamp(velocity, 0.0, 0.3)
-            creature.heading += heading_delta * delta_time
+            creature.velocity = clamp(velocity, 0.0, \
+                self.max_creature_velocity)
+            creature.heading += heading_delta * self.delta_time
             
             # Make sure the heading is in the interval [0, 2pi).
             creature.heading %= 2 * math.pi
             
             # Update creature position.
-            pos_delta_x = creature.velocity * math.cos(creature.heading) * delta_time
-            pos_delta_y = creature.velocity * math.sin(creature.heading) * delta_time
+            pos_delta_x = creature.velocity * math.cos(creature.heading) * self.delta_time
+            pos_delta_y = creature.velocity * math.sin(creature.heading) * self.delta_time
             creature.position[0] += pos_delta_x
             creature.position[1] += pos_delta_y
             
@@ -115,7 +124,7 @@ class Environment:
                 copy.deepcopy((creature.position, creature.velocity, creature.heading))))
             
             # Increment current time.
-            current_time += delta_time
+            current_time += self.delta_time
         
         # If this is a single threaded call, return the creature position data.
         if not multi_threaded:
@@ -124,7 +133,7 @@ class Environment:
         else:
             shared_dict[creature.id] = positions
     
-    def simulate(self, delta_time, max_time=10, debug=False):
+    def simulate(self, debug=False):
         """
         Populates a dictionary with the data returned from the simulate 
         function for each of the creatures. Returns the dictionary afterwards.
@@ -139,7 +148,6 @@ class Environment:
         # Loop over all creatures and simulate each one.
         for creature in self.creatures:
             creature_data = self.simulate_creature(creature=creature, \
-                delta_time=delta_time, max_time=max_time, \
                 multi_threaded=False)
             creature_data_dict[creature.id] = creature_data
         
@@ -150,8 +158,7 @@ class Environment:
         #return time_data, creature_data
         return creature_data_dict
     
-    def simulate_multi_threaded(self, delta_time, max_time=10, \
-        num_threads=4, debug=False):
+    def simulate_multi_threaded(self, num_threads=4, debug=False):
         """
         Populates a dictionary with the data returned from the simulate 
         function for each of the creatures. Returns the dictionary afterwards.
@@ -169,7 +176,7 @@ class Environment:
         # Create list of arguments to starmap.
         starmap_args = []
         for creature in self.creatures:
-            starmap_args.append((creature, delta_time, max_time, True, \
+            starmap_args.append((creature, self.delta_time, self.max_time, True, \
                 creature_data_dict))
         
         # Starmap simulation of all creatures.

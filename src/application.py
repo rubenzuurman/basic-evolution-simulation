@@ -5,8 +5,6 @@ from neural_network import ActivationFunction
 
 from window import Window
 
-import math
-
 def rule_topleft(x, y, hdg, gen):
     """
     In the first 50 generations, any creature ending up at the right half of 
@@ -54,25 +52,33 @@ def rule_bottomright(x, y, hdg, gen):
     return x > num and y < num
 
 def main():
-    # Initialize simulations specs.
+    # Initialize simulations specs (just some random examples).
     sim_topleft = {"number_of_creatures": 50, \
         "evolution_rule": rule_topleft, "brain_hidden_layers": (8, 8, 8), \
-        "brain_activation_functions": ActivationFunction.Relu}
+        "brain_activation_functions": ActivationFunction.Relu, \
+        "delta_time": 0.1, "max_time": 15.0, "mutation_max": 0.5}
     sim_topright = {"number_of_creatures": 50, \
-        "evolution_rule": rule_topright, "brain_hidden_layers": (8, 8, 8), \
-        "brain_activation_functions": ActivationFunction.Linear}
+        "evolution_rule": rule_topright, "brain_hidden_layers": (8, 8), \
+        "brain_activation_functions": ActivationFunction.Linear, \
+        "delta_time": 0.1, "max_time": 10.0}
     sim_bottomleft = {"number_of_creatures": 50, \
-        "evolution_rule": rule_bottomleft, "brain_hidden_layers": (8, 8, 8), \
-        "brain_activation_functions": ActivationFunction.BinaryStep}
+        "evolution_rule": rule_bottomleft, "brain_hidden_layers": (8,), \
+        "brain_activation_functions": ActivationFunction.BinaryStep, \
+        "delta_time": 0.1, "max_time": 7.5}
     sim_bottomright = {"number_of_creatures": 50, \
-        "evolution_rule": rule_bottomright, "brain_hidden_layers": (8, 8, 8), \
-        "brain_activation_functions": ActivationFunction.Softplus}
+        "evolution_rule": rule_bottomright, "brain_hidden_layers": (8,), \
+        "brain_activation_functions": ActivationFunction.Softplus, \
+        "delta_time": 0.05, "max_time": 5.0, "max_creature_velocity": 0.5}
     simulation_specs = (sim_topleft, sim_topright, sim_bottomleft, \
         sim_bottomright)
     
     # Start rendering window.
     window = Window(window_dimensions=(1920, 1350), \
-        simulation_specs=simulation_specs, enable_multithreading=True)
+        simulation_specs=simulation_specs, enable_multithreading=False, \
+        mutation_chance=0.01, mutation_max=0.05, brain_hidden_layers=(8,), \
+        brain_activation_functions=ActivationFunction.Relu, delta_time=0.01, \
+        max_time=10.0, max_creature_velocity=0.25, generations_per_render=1, \
+        render_speedup=1.0)
     window.start(fps=60)
     window.quit()
 
