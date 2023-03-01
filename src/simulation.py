@@ -206,7 +206,7 @@ class Environment:
             pos_x = creature.position[0]
             pos_y = creature.position[1]
             hdg   = creature.heading
-            if rule(pos_x, pos_y, hdg, generation):
+            if rule(pos_x, pos_y, hdg, generation) == True:
                 survivors.append(creature)
         
         # Shuffle the list.

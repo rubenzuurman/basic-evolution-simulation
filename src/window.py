@@ -118,6 +118,26 @@ class SimulationData:
             self.creature_data_dict = {}
             self.is_rendering = False
 
+def default_graph_color_generator(index):
+    """
+    Default graph color generator. Generates (in some sense) simple colors 
+    until it runs out. After these are used up it generates somewhat random 
+    colors.
+    """
+    # Define simple colors.
+    simple_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), \
+        (255, 0, 255), (0, 255, 255), (128, 0, 0), (0, 128, 0), (0, 0, 128), \
+        (128, 128, 0), (128, 0, 128), (0, 128, 128)]
+    
+    # Return a simple color if possible.
+    if index < len(simple_colors):
+        return simple_colors[index]
+    
+    # Else return a somewhat random color.
+    adjusted_index = index - len(simple_colors)
+    return ((200 + adjusted_index * 25) % 255, \
+        (100 + adjusted_index * 50) % 255, (adjusted_index * 100) % 255)
+
 class Window:
     
     def __init__(self, window_dimensions, simulation_specs, \
@@ -125,7 +145,9 @@ class Window:
         mutation_max=0.05, brain_hidden_layers=(8,), \
         brain_activation_functions=ActivationFunction.Relu, delta_time=0.1, \
         max_time=10.0, max_creature_velocity=0.25, generations_per_render=1, \
-        render_speedup=1.0):
+        render_speedup=1.0, graph_initial_span=100, graph_max_span=int(1e9), \
+        graph_max_number_of_ticks=8, \
+        graph_color_generator=default_graph_color_generator):
         """
         Initializes pygame and creates a font and a display. It creates 
         simulations based on the provided simulation specs.
@@ -220,6 +242,18 @@ class Window:
             simulations should be rendered. For example, a setting of 1.0 
             renders the simulation in real time, 0.5 at half the speed, and 
             2.0 at double the speed.
+        Graph initial span specifies the number of generations that fit 
+            inside the graph at the start of the program. Must be an integer 
+            greater than or equal to 2.
+        Graph max span specifies the number of generations that may fit 
+            inside the graph before it switches to scrolling. Must be an 
+            integer greater than or equal to 2.
+        Graph max number of ticks specifies the maximum number of ticks to 
+            display on the x axis of the graph. Must be a non-negative 
+            integer. Set to 0 to show no ticks.
+        Graph color generator is a function which takes the simulation index 
+            as a parameter and return the color for that simulation. The 
+            color white is used if no valid color is returned.
         """
         # Check types.
         func_name = "Window.__init__()"
@@ -417,6 +451,28 @@ class Window:
         assert render_speedup > 0, f"{func_name}: Render " \
             "speedup must be a positive float."
         
+        # Check if graph_initial_span is a positive integer.
+        assert isinstance(graph_initial_span, int), f"{func_name}: Graph " \
+            "initial span must be an integer greater than or equal to 2."
+        assert graph_initial_span >= 2, f"{func_name}: Graph " \
+            "initial span must be an integer greater than or equal to 2."
+        
+        # Check if graph_max_span is an integer greater than or equal to 2.
+        assert isinstance(graph_max_span, int), f"{func_name}: Graph " \
+            "max span must be an integer greater than or equal to 2."
+        assert graph_max_span >= 2, f"{func_name}: Graph " \
+            "max span must be an integer greater than or equal to 2."
+        
+        # Check if graph_max_number_of_ticks is a non-negative integer.
+        assert isinstance(graph_max_number_of_ticks, int), f"{func_name}: " \
+            "Graph max number of ticks must be a non-negative integer."
+        assert graph_max_number_of_ticks >= 0, f"{func_name}: " \
+            "Graph max number of ticks must be a non-negative integer."
+        
+        # Check if graph color generator is callable.
+        assert callable(graph_color_generator), f"{func_name}: " \
+            "Graph color generator must be callable."
+        
         # Warn the user if delta_time is greater than or equal to max_time.
         if delta_time >= max_time:
             print(f"[WARNING] Delta time is greater than or equal to max " \
@@ -440,6 +496,7 @@ class Window:
 
         # Initialize font.
         self.font = pygame.font.SysFont("Courier New", 16)
+        self.graph_label_font = pygame.font.SysFont("Courier New", 12)
         
         # Create display.
         self.window_dimensions = window_dimensions
@@ -532,6 +589,12 @@ class Window:
         # Initialize multiprocessing pool if enabled.
         self.mt = enable_multithreading
         self.pool = mp.Pool() if self.mt else None
+        
+        # Set graph parameter member variables.
+        self.graph_initial_span = graph_initial_span
+        self.graph_max_span = graph_max_span
+        self.graph_max_number_of_ticks = graph_max_number_of_ticks
+        self.graph_color_generator = graph_color_generator
     
     def start(self, fps=60):
         """
@@ -656,12 +719,12 @@ class Window:
             # Run simulation and evolve.
             sim.simulate_and_evolve(generation=self.generation)
         
-        # Render simulation if necessary.
-        render_sim = self.generation % self.generations_per_render == 0
-        
-        # Increment generation after checking whether to render or not to 
-        # make sure the 0th generation is always rendered.
+        # Increment generation.
         self.generation += 1
+        
+        # Render simulation if necessary or if this was the first simulation.
+        render_sim = self.generation % self.generations_per_render == 0 \
+            or self.generation == 1
         
         # Return boolean.
         return render_sim
@@ -686,12 +749,12 @@ class Window:
             self.simulations[index].creature_data_dict = result.get()[1]
             self.simulations[index].survivors_accumulate = result.get()[2]
         
-        # Render simulation if necessary.
-        render_sim = self.generation % self.generations_per_render == 0
-        
-        # Increment generation after checking whether to render or not to 
-        # make sure the 0th generation is always rendered.
+        # Increment generation.
         self.generation += 1
+        
+        # Render simulation if necessary or if this was the first simulation.
+        render_sim = self.generation % self.generations_per_render == 0 \
+            or self.generation == 1
         
         # Return boolean.
         return render_sim
@@ -704,12 +767,52 @@ class Window:
         text_surface = self.font.render(text, False, color)
         self.display.blit(text_surface, position)
     
+    def render_graph_text(self, text, position, center="both", \
+        color=(255, 255, 255)):
+        """
+        Renders the text at the position specified. Uses the specified color 
+        if specified, otherwise uses white. Uses the graph label font. 
+        Centers in the y direction if center is 'vertical', in the x 
+        direction if center is 'horizontal', and in both directions if center 
+        is 'both'.
+        """
+        text_surface = self.graph_label_font.render(text, False, color)
+        if center == "vertical":
+            self.display.blit(text_surface, \
+                (position[0], position[1] - text_surface.get_height() / 2))
+        elif center == "horizontal":
+            self.display.blit(text_surface, \
+                (position[0] - text_surface.get_width() / 2, position[1]))
+        elif center == "both":
+            self.display.blit(text_surface, \
+                (position[0] - text_surface.get_width() / 2, \
+                    position[1] - text_surface.get_height() / 2))
+        else:
+            self.display.blit(text_surface, position)
+            print("[WARNING] Window.render_graph_text(): Invalid value " \
+                f"for center parameter '{center}'.")
+    
     def render_survivor_graph(self):
-        # Define color set.
-        colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), \
-            (255, 0, 255), (0, 255, 255), (255, 255, 255), (255, 128, 0), \
-            (255, 0, 128), (0, 255, 128), (128, 255, 0), (0, 128, 255), \
-            (128, 0, 255)]
+        # Get number of generations from first simulation.
+        num_gens = len(self.simulations[0].survivors_accumulate)
+        
+        # Reduce initial span if max span is smaller.
+        initial_span = self.graph_initial_span
+        max_span = self.graph_max_span
+        if max_span < initial_span:
+            initial_span = max_span
+        
+        # Calculate start and end index of the graph.
+        if num_gens <= initial_span:
+            start_index = 1
+            end_index = initial_span
+        else:
+            if num_gens < max_span:
+                start_index = 1
+                end_index = num_gens
+            else:
+                start_index = num_gens - max_span + 1
+                end_index = num_gens
         
         # Define graph width.
         graph_width  = 1000
@@ -719,27 +822,143 @@ class Window:
         min_x = (self.window_dimensions[0] - graph_width) / 2
         min_y = 25
         
-        # Render outer rect.
+        # Render outer rect (the extra one is to create an interior of 
+        # graph_width pixels wide).
         pygame.draw.rect(self.display, (40, 40, 40), \
-            (min_x - 1, min_y - 1, graph_width + 2, graph_height + 2))
+            (min_x - 1, min_y - 1, graph_width + 2 + 1, graph_height + 2))
         pygame.draw.rect(self.display, (0, 0, 0), \
-            (min_x, min_y, graph_width, graph_height))
+            (min_x, min_y, graph_width + 1, graph_height))
+        
+        # Render y axis ticks and labels.
+        pygame.draw.line(self.display, (120, 120, 120), (min_x - 1, min_y - 1), \
+            (min_x - 5, min_y - 1))
+        self.render_graph_text("100%", (min_x - 35, min_y), \
+            center="vertical", color=(120, 120, 120))
+        
+        pygame.draw.line(self.display, (120, 120, 120), (min_x - 1, min_y + graph_height / 2), \
+            (min_x - 5, min_y + graph_height / 2))
+        self.render_graph_text(" 50%", (min_x - 35, min_y + graph_height / 2), \
+            center="vertical", color=(120, 120, 120))
+        
+        pygame.draw.line(self.display, (120, 120, 120), (min_x - 1, min_y + graph_height), \
+            (min_x - 5, min_y + graph_height))
+        self.render_graph_text("  0%", (min_x - 35, min_y + graph_height), \
+            center="vertical", color=(120, 120, 120))
+        
+        # Render horizontal lines in the graph at 25%, 50%, and 75%.
+        horizontal_line_y_coords = [graph_height / 4 * 1, \
+            graph_height / 4 * 2, graph_height / 4 * 3]
+        for line_y in horizontal_line_y_coords:
+            pygame.draw.line(self.display, (40, 40, 40), \
+                (min_x, min_y + line_y), \
+                (min_x + graph_width, min_y + line_y))
+        
+        # Choose x axis ticks and labels.
+        xticks = []
+        xticks_delta_generator = lambda index: [1 * 10 ** (index // 3), \
+            2 * 10 ** (index // 3), 5 * 10 ** (index // 3)][index % 3]
+        for i in range(81):
+            # If max ticks is equal to zero, break so the xticks list stays 
+            # empty.
+            if self.graph_max_number_of_ticks == 0:
+                break
+            
+            # Get next tick size.
+            tick_size = xticks_delta_generator(i)
+            
+            # Skip tick size if the numbers of ticks is at least bigger than 
+            # the maximum number of ticks.
+            if (end_index - start_index) // tick_size > self.graph_max_number_of_ticks:
+                continue
+            
+            # Calculate start and end of the checkable region.
+            check_start = (start_index // tick_size) * tick_size
+            check_end   = (end_index // tick_size + 1) * tick_size
+            
+            # Get ticks inside visible region.
+            xticks = [tick for tick \
+                in range(check_start, check_end + tick_size, tick_size) \
+                if tick >= start_index and tick <= end_index]
+            
+            # Add 1 to xticks if the start index is equal to 1.
+            if start_index == 1:
+                xticks = [1] + xticks
+            
+            # Calculate number of ticks and break if it is lower or equal to 
+            # the maximum number of ticks.
+            num_ticks = len(xticks)
+            if num_ticks <= self.graph_max_number_of_ticks:
+                break
+        
+        # Create function for calculating the x coordinate of a datapoint.
+        # Coefficients calculated by drawing a line from (1, 1) to 
+        # (end - start, graph_width + 1). This will create a mapping from 1 
+        # to end - start to 1 to 1001, which can be shifted left by 1.
+        a = graph_width / (end_index - start_index)
+        b = 1 - a
+        calculate_graph_x = lambda x: a * (x + 1 - start_index) + b - 1
+        
+        # Iterate over all xticks.
+        for xtick in xticks:
+            # Calculate screen x value of the tick.
+            line_x = min_x + calculate_graph_x(xtick)
+            
+            # Render x axis ticks and labels.
+            pygame.draw.line(self.display, (120, 120, 120), \
+                (line_x, min_y + graph_height), \
+                (line_x, min_y + graph_height + 5))
+            self.render_graph_text(f"{xtick}", (line_x, min_y + graph_height + 8), \
+                center="horizontal", color=(120, 120, 120))
+            
+            # Render vertical line.
+            pygame.draw.line(self.display, (40, 40, 40), (line_x, min_y), \
+                (line_x, min_y + graph_height))
         
         # Loop over all simulations.
         for index, sim in enumerate(self.simulations):
             # Generate datapoints.
             screen_points = []
             for x, y in enumerate(sim.survivors_accumulate):
-                screen_x = int(min_x + x)
+                # Shift range from 0-gens-1 to 1-gens.
+                x += 1
+                
+                # Check if this point is inside the graph.
+                if x < start_index or x > end_index:
+                    continue
+                
+                # Calculate screen coordinates of the point and add it to the 
+                # list.
+                screen_x = min_x + calculate_graph_x(x)
                 screen_y = int(min_y + graph_height - 100 \
                     * (y / sim.environment.number_of_creatures))
                 screen_points.append((screen_x, screen_y))
             
             # Render datapoints.
             if len(screen_points) >= 2:
-                if index >= len(colors):
+                # Get color from color generator.
+                color = self.graph_color_generator(index)
+                
+                # Check if color is valid.
+                if not isinstance(color, tuple):
+                    print(f"[WARNING] [Simulation {index}] Invalid color " \
+                        f"was returned from color generator '{color}'.")
                     color = (255, 255, 255)
-                else:
-                    color = colors[index]
+                if not len(color) == 3:
+                    print(f"[WARNING] [Simulation {index}] Invalid color " \
+                        f"was returned from color generator '{color}'.")
+                    color = (255, 255, 255)
+                for c in color:
+                    if not isinstance(c, int):
+                        print(f"[WARNING] [Simulation {index}] Invalid color " \
+                            f"was returned from color generator '{color}'.")
+                        color = (255, 255, 255)
+                        break
+                    if not (c >= 0 and c <= 255):
+                        print(f"[WARNING] [Simulation {index}] Invalid color " \
+                            f"was returned from color generator '{color}'.")
+                        color = (255, 255, 255)
+                        break
+                
+                # Render lines.
                 pygame.draw.lines(self.display, color, closed=False, \
                     points=screen_points)

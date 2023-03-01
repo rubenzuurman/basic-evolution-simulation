@@ -171,11 +171,31 @@ $y_{offset} = - f/2$
 ## Multithreading
 Multithreading is currently supported in the sense that when a step of simulation and evolution is run, every simulation runs on its own thread. These threads are joined directly after simulating, meaning the application is as fast as the slowest simulation while simulating. Multithreading can be enabled by supplying the `Window` constructor with `enable_multithreading=True`, it is disabled by default.
 
+## Graph
+The graph displays the percentage of creatures that survived each generation for each simulation. The graph can be customized by passing any of the following parameters to the `Window` constructor:
+
+**graph_initial_span** *optional (default=100)* - Specifies the number of generations that fit inside the graph on startup. Must be an integer greater than or equal to 2.<br />
+**graph_max_span** *optional (default=int(1e9))* - Specifies the maximum number of generations that can fit inside the graph. The graph starts at the initial span and increases its span until it reaches the max span, after which is starts scrolling. When the graph starts scrolling, the number of generations that fit inside the graph stays fixed and values that would be rendered to the left of graph are no longer rendered. Must be an integer greater than or equal to 2. If this parameter is smaller than the initial span, the graph will scroll from startup and the max span will be used as the initial span.<br />
+**graph_max_number_of_ticks** *optional (default=8)* - Specifies the maximum number of ticks to display on the x axis of the graph. Must be a non-negative integer. Set to 0 to show no ticks.<br />
+**graph_color_generator** *optional (default=some_function)* - Function which takes the simulation index as a parameter and returns the color for that simulation. The color white is used if no valid color is returned.
+
 ## Future plans
 - [x] Make more of the program configurable. *27-02-2023*
-- [ ] Improve the graph.
+- [x] Improve the graph. *01-03-2023*
 - [ ] Add way to visualize neural networks used in each simulation.
 - [ ] Add way to visualize the rule used for each simulation.
+
+## Changelog
+
+### 01-03-2023
+- *New*: Added ticks and labels to both axes of the graph.
+- *New*: Added configurable parameters for controlling the graph.
+
+### 28-02-2023
+- *Fix*: Fix issue where the generation number is always one ahead of the specified render interval.
+
+### 27-02-2023
+- *New*: Added many configurable parameters to the program and to the simulations.
 
 <!--
 If rows is even:

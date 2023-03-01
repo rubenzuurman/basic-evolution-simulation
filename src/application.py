@@ -73,12 +73,13 @@ def main():
         sim_bottomright)
     
     # Start rendering window.
-    window = Window(window_dimensions=(1920, 1350), \
+    window = Window(window_dimensions=(1920, 1400), \
         simulation_specs=simulation_specs, enable_multithreading=False, \
         mutation_chance=0.01, mutation_max=0.05, brain_hidden_layers=(8,), \
         brain_activation_functions=ActivationFunction.Relu, delta_time=0.01, \
         max_time=10.0, max_creature_velocity=0.25, generations_per_render=1, \
-        render_speedup=1.0)
+        render_speedup=1.0, graph_initial_span=100, graph_max_span=int(1e9), \
+        graph_max_number_of_ticks=8)
     window.start(fps=60)
     window.quit()
 
