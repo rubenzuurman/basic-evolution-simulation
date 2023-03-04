@@ -268,7 +268,8 @@ class Environment:
         # 5% of the field size, centered vertically if necessary.
         # Equation used: width = margin + (field + margin) * layout[0]
         #   with margin = 0.05 * field
-        available_width = 1100
+        # Normal available width: 1100 at 1920x1400
+        available_width = min(window_dimensions) / 1400 * 1100
         field_size = available_width / (1.05 * layout[0] + 0.05)
         margin = 0.05 * field_size
         

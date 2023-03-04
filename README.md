@@ -187,6 +187,9 @@ The graph displays the percentage of creatures that survived each generation for
 
 ## Changelog
 
+### 04-03-2023
+- *New*: The window is now resizable.
+
 ### 01-03-2023
 - *New*: Added ticks and labels to both axes of the graph.
 - *New*: Added configurable parameters for controlling the graph.

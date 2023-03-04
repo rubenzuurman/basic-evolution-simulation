@@ -501,7 +501,7 @@ class Window:
         # Create display.
         self.window_dimensions = window_dimensions
         self.display = pygame.display.set_mode(window_dimensions, \
-            flags=pygame.HWSURFACE | pygame.DOUBLEBUF)
+            flags=pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.RESIZABLE)
         pygame.display.set_caption("Basic Evolution Simulation")
         
         # Initialize simulations.
@@ -632,6 +632,12 @@ class Window:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                
+                # Detect resize event.
+                if event.type == pygame.VIDEORESIZE:
+                    self.display = pygame.display.set_mode((event.w, event.h), \
+                        flags=pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.RESIZABLE)
+                    self.window_dimensions = (event.w, event.h)
             
             # Fill display with black.
             self.display.fill((0, 0, 0))
@@ -814,13 +820,16 @@ class Window:
                 start_index = num_gens - max_span + 1
                 end_index = num_gens
         
-        # Define graph width.
-        graph_width  = 1000
-        graph_height = 100
+        # Define graph width (default: w=1000, h=100, gap=25).
+        graph_width = min(self.window_dimensions) / 1400 * 1000
+        graph_height = min(self.window_dimensions) / 1400 * 100
+        graph_gap = min(self.window_dimensions) / 1400 * 25
         
         # Define minimum and maximum x and y for graph.
         min_x = (self.window_dimensions[0] - graph_width) / 2
-        min_y = 25
+        available_width_sim = min(self.window_dimensions) / 1400 * 1100
+        min_y = (self.window_dimensions[1] - available_width_sim) / 2 \
+            - graph_height - graph_gap
         
         # Render outer rect (the extra one is to create an interior of 
         # graph_width pixels wide).
@@ -929,7 +938,7 @@ class Window:
                 # Calculate screen coordinates of the point and add it to the 
                 # list.
                 screen_x = min_x + calculate_graph_x(x)
-                screen_y = int(min_y + graph_height - 100 \
+                screen_y = int(min_y + graph_height - graph_height \
                     * (y / sim.environment.number_of_creatures))
                 screen_points.append((screen_x, screen_y))
             
