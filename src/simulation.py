@@ -256,13 +256,16 @@ class Environment:
         
         return number_of_survivors
     
-    def render(self, display, window_dimensions, creatures, layout, index):
+    def render(self, display, window_dimensions, creatures, layout, index, \
+        graph_color_generator, render_labels):
         """
         Renders the field and the creatures using the data supplied in the 
         creatures parameter. The layout parameter specifies the grid 
         dimensions and the index specifies the index of this simulation. The 
         first index is top left, the second to the right of that, etc, row by 
-        row.
+        row. The graph color generator should be the same as the one set by 
+        the Window constructor. Render labels is a boolean specifying whether 
+        or not to render color labels.
         """
         # Calculate grid margin and field size. The margin should always be 
         # 5% of the field size, centered vertically if necessary.
@@ -329,6 +332,43 @@ class Environment:
                 (screen_x, screen_y), int(creature_size_outside))
             pygame.draw.circle(display, creature_color_inside, \
                 (screen_x, screen_y), int(creature_size_inside))
+        
+        # Render graph color label if enabled.
+        if render_labels:
+            # Get color from color generator.
+            color = graph_color_generator(index)
+            
+            # If the color returned is not valid, replace it with white. 
+            # Print a warning if necessary.
+            if not isinstance(color, tuple):
+                print(f"[WARNING] [Simulation {index}] Invalid color " \
+                    f"was returned from color generator '{color}'.")
+                color = (255, 255, 255)
+            elif not len(color) == 3:
+                print(f"[WARNING] [Simulation {index}] Invalid color " \
+                    f"was returned from color generator '{color}'.")
+                color = (255, 255, 255)
+            elif False in [isinstance(n, int) for n in color]:
+                print(f"[WARNING] [Simulation {index}] Invalid color " \
+                    f"was returned from color generator '{color}'.")
+                color = (255, 255, 255)
+            elif False in [n >= 0 and n <= 255 for n in color]:
+                print(f"[WARNING] [Simulation {index}] Invalid color " \
+                    f"was returned from color generator '{color}'.")
+                color = (255, 255, 255)
+            
+            # Render partially opaque rectangle with colored line.
+            surf_width = int(field_size / 6)
+            surf_height = int(field_size / 6 / 4)
+            surf = pygame.Surface((surf_width, surf_height), pygame.SRCALPHA)
+            surf.fill((0, 0, 0, 150))
+            pygame.draw.line(surf, color, \
+                (surf_width * 0.125, surf_height // 2), \
+                (surf_width * 0.875, surf_height // 2))
+            
+            # Blit surface to display.
+            display.blit(surf, (field_x + field_size - surf_width * 1.125, \
+                field_y + surf_height // 2))
 
 class Creature:
     """

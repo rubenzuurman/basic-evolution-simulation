@@ -595,6 +595,10 @@ class Window:
         self.graph_max_span = graph_max_span
         self.graph_max_number_of_ticks = graph_max_number_of_ticks
         self.graph_color_generator = graph_color_generator
+        
+        # Initialize dictionary for rendering toggles.
+        self.rendering_toggles = {"graph": True, "text": True, \
+            "labels": True, "rules": True, "neural_networks": True}
     
     def start(self, fps=60):
         """
@@ -630,8 +634,26 @@ class Window:
                     running = False
                 
                 if event.type == pygame.KEYDOWN:
+                    # Detect quit event number two.
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    
+                    # Toggle rendering toggles.
+                    if event.key == pygame.K_g:
+                        self.rendering_toggles["graph"] = \
+                            not self.rendering_toggles["graph"]
+                    if event.key == pygame.K_t:
+                        self.rendering_toggles["text"] = \
+                            not self.rendering_toggles["text"]
+                    if event.key == pygame.K_l:
+                        self.rendering_toggles["labels"] = \
+                            not self.rendering_toggles["labels"]
+                    if event.key == pygame.K_r:
+                        self.rendering_toggles["rules"] = \
+                            not self.rendering_toggles["rules"]
+                    if event.key == pygame.K_n:
+                        self.rendering_toggles["neural_networks"] = \
+                            not self.rendering_toggles["neural_networks"]
                 
                 # Detect resize event.
                 if event.type == pygame.VIDEORESIZE:
@@ -680,25 +702,39 @@ class Window:
                 sim.environment.render(self.display, \
                     window_dimensions=self.window_dimensions, \
                     creatures=sim.current_creature_data, \
-                    layout=self.render_layout, index=index)
+                    layout=self.render_layout, index=index, \
+                    graph_color_generator=self.graph_color_generator, \
+                    render_labels=self.rendering_toggles["labels"])
             
-            # Render debug text.
-            self.render_text(f"Rendering simulation: " \
-                f"{rendering_simulation}", (10, 10))
-            self.render_text(f"Current number of creatures: " \
-                f"{self.number_of_creatures}", (10, 30))
-            time_since_start_render = 0 if simulation_start == 0 \
-                else time.time() - simulation_start
-            self.render_text(f"Time since rendering start: " \
-                f"{time_since_start_render:.1f}", (10, 50))
-            self.render_text(f"Generation {self.generation}", (10, 70))
-            mt_string = "Enabled" if self.mt else "Disabled"
-            mt_procs = f" ({self.pool._processes} threads)" if self.mt else ""
-            self.render_text(f"Multithreading: {mt_string}{mt_procs}", \
-                (10, 90))
+            # Render text if enabled.
+            if self.rendering_toggles["text"]:
+                # Render debug text.
+                self.render_text(f"Rendering simulation: " \
+                    f"{rendering_simulation}", (10, 10))
+                self.render_text(f"Current number of creatures: " \
+                    f"{self.number_of_creatures}", (10, 30))
+                time_since_start_render = 0 if simulation_start == 0 \
+                    else time.time() - simulation_start
+                self.render_text(f"Time since rendering start: " \
+                    f"{time_since_start_render:.1f}", (10, 50))
+                self.render_text(f"Generation {self.generation}", (10, 70))
+                mt_string = "Enabled" if self.mt else "Disabled"
+                mt_procs = f" ({self.pool._processes} threads)" if self.mt else ""
+                self.render_text(f"Multithreading: {mt_string}{mt_procs}", \
+                    (10, 90))
+                
+                # Render rendering toggle statuses.
+                self.render_text("Rendering Toggles", (10, 130))
+                toggles = list(self.rendering_toggles.values())
+                self.render_text(f"    Graph (G):  {toggles[0]}", (10, 150))
+                self.render_text(f"    Text (T):   {toggles[1]}", (10, 170))
+                self.render_text(f"    Labels (L): {toggles[2]}", (10, 190))
+                #self.render_text(f"    Rules: {toggles[3]}", (10, 210))
+                #self.render_text(f"    Neural Networks: {toggles[4]}", (10, 230))
             
             # Render survivors graph.
-            self.render_survivor_graph()
+            if self.rendering_toggles["graph"]:
+                self.render_survivor_graph()
             
             # Update display.
             pygame.display.flip()

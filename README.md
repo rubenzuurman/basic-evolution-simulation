@@ -187,6 +187,10 @@ The graph displays the percentage of creatures that survived each generation for
 
 ## Changelog
 
+### 08-03-2023
+- *New*: Added labels to the simulations containing the color of the graph line corresponding to that simulation.
+- *New*: Rendering of the graph, text, and labels can now be toggled by pressing 'G', 'T', or 'L', respectively.
+
 ### 04-03-2023
 - *New*: The window is now resizable.
 
